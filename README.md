@@ -1,4 +1,4 @@
-### Phân tích các yếu tố ảnh hưởng đến giá niêm yết của vi xử lý Intel
+### Phân tích các yếu tố kĩ thuật ảnh hưởng đến phân khúc sản phẩm của vi xử lý Intel
 
 1. Tổng quan dữ liệu
 
