@@ -11,20 +11,13 @@ data[data == "NA"] <- NA
 data[data == ""] <- NA
 
 ## Lọc các thông số kĩ thuật
+# Đã sửa lỗi chính tả chữ "Available"
 data <- data[, c("TDP",                                 # Y: Lượng nhiệt CPU tỏa ra 
                  "nb_of_Cores",                         # số nhân
                  "Processor_Base_Frequency",            # xung nhịp cơ bản
-                 "Vertical_Segment",                    # Phân khúc           # bộ nhớ đệm
+                 "Vertical_Segment",                    # Phân khúc
                  "Lithography",                         # tiến trình (nm)
-                 "Intel_64_" )]                         # Kiến trúc (Thêm dấu đóng ngoặc vuông nếu thiếu)
-View(data) # code bug gì -> Đã sửa thành dấu #
-## Lọc các thông số kĩ thuật
-data <- data[, c("TDP",                                 # Y: Lượng nhiệt CPU tỏa ra 
-                 "nb_of_Cores",                         # số nhân
-                 "Processor_Base_Frequency",            # xung nhịp cơ bản
-                 "Vertical_Segment",                    # Phân khúc           # bộ nhớ đệm
-                 "Lithography",                         # tiến trình (nm)
-                 "Intel_64_" )]                         # Kiến trúc (Thêm dấu đóng ngoặc vuông nếu thiếu)
+                 "Embedded_Options_Available" )]        # Đã sửa lỗi chính tả ở đây
 View(data) 
 
 
@@ -33,31 +26,16 @@ View(data)
   na_count <- colSums(is.na(data))
   print(na_count)
   
-  ## Xóa các dòng khuyết ở Cache, Lithography, Processor_Base_Frequency
-  cols_drop <- c("Processor_Base_Frequency")
-  data <- data[complete.cases(data[, cols_drop]), ]
-  
+  ## Xóa các dòng khuyết ở Processor_Base_Frequency, Embedded_Options_Available 
+  cols_drop <- c("Processor_Base_Frequency", "Embedded_Options_Available","TDP","Lithography")
+  data <- data[complete.cases(data[, cols_drop]), ] # Thay // bằng # để không bị lỗi cú pháp
+
   ## Kiểm tra lại số NA từng cột
   print(colSums(is.na(data)))
   View(data)
 }
 
-# Bar chart các giá trị xuất hiện nhiều nhất mỗi cột
-plot_top <- function(x, name, top = 15) {
-  tb     <- sort(table(x, useNA = "ifany"), decreasing = TRUE)
-  n_uniq <- length(tb)
-  counts <- head(as.vector(tb), top)
-  labs   <- head(names(tb), top)
-  labs[is.na(labs)] <- "NA"
-  par(mar = c(10, 4, 3, 1))
-  bp <- barplot(counts, names.arg = labs, las = 2, col = "steelblue",
-                main = paste0(name, " (", n_uniq, " giá trị khác nhau)"),
-                ylab = "Số lượng", ylim = c(0, max(counts) * 1.15))
-  text(bp, counts, labels = counts, pos = 3, cex = 0.7)
-}
-for (col in names(data)) plot_top(data[[col]], col)
-
-## Xử lí nhóm thiểu số, không đủ dữ liệu xác minh trong mỗi oột
+## Thống nhất đơn vị
 #  Bar chart DẠNG CHUỖI (thay số bằng #)
 {
   plot_pattern <- function(x, name) {
@@ -74,8 +52,38 @@ for (col in names(data)) plot_top(data[[col]], col)
   }
   
   plot_pattern(data$Processor_Base_Frequency,    "Xung nhịp")
+  
+  ## Đổi xung nhịp về một đơn vị duy nhất: GHz (dạng số)
+  {
+    f   <- trimws(as.character(data$Processor_Base_Frequency))
+    val <- as.numeric(sub("^([0-9.]+).*", "\\1", f))            # lấy số đầu tiên
+    data$Processor_Base_Frequency <- ifelse(grepl("MHz", f, ignore.case = TRUE),
+                                            val / 1000,          # MHz -> GHz
+                                            val)    # GHz giữ nguyên
+    plot_pattern(data$Processor_Base_Frequency,    "Xung nhịp")
+    
+  }
+  
   plot_pattern(data$Lithography,                 "Tiến trình")
   plot_pattern(data$TDP,                         "TDP" )
+  
+  # Đổi các đại lượng còn lại thành dạng số
+  {
+    data$Lithography <- as.numeric(sub("^([0-9.]+).*", "\\1", trimws(data$Lithography)))  # nm
+    data$TDP         <- as.numeric(sub("^([0-9.]+).*", "\\1", trimws(data$TDP)))          # W
+    data$nb_of_Cores <- as.numeric(data$nb_of_Cores)
+  }
+  
+  # Đánh index cho các biến định tính 
+  {
+    print(table(data$Vertical_Segment, useNA = "ifany"))
+    print(table(data$Embedded_Options_Available, useNA = "ifany"))   # xem có đúng Yes/No không
+    
+    data$Vertical_Segment <- factor(data$Vertical_Segment,
+                                    levels = c("Desktop", "Mobile", "Server", "Embedded"))
+    data$Embedded_Options_Available <- factor(data$Embedded_Options_Available,
+                                              levels = c("No", "Yes"))
+  }
 }
 
 View(data)
