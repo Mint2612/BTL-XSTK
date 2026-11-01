@@ -29,7 +29,7 @@ View(data)
   na_count <- colSums(is.na(data))
   print(na_count)
   
-  # Xóa các dòng khuyết ở Processor_Base_Frequency, Embedded_Options_Available 
+  # Xóa các dòng khuyết ở các biến 
   cols_drop <- c("Processor_Base_Frequency", "Embedded_Options_Available","TDP","Lithography")
   data <- data[complete.cases(data[, cols_drop]), ] # Thay // bằng # để không bị lỗi cú pháp
 
