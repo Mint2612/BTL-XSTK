@@ -19,7 +19,7 @@ data <- data[, c("TDP",                                 # Y: Lượng nhiệt CP
                  "Processor_Base_Frequency",            # xung nhịp cơ bản
                  "Vertical_Segment",                    # Phân khúc
                  "Lithography",                         # tiến trình (nm)
-                 "Embedded_Options_Available" )]        # Đã sửa lỗi chính tả ở đây
+                 "Embedded_Options_Available" )]        # Tùy chọn nhúng
 View(data) 
 
 
