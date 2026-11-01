@@ -3,12 +3,14 @@
 ## Đọc dữ liệu 
 # data <- read.csv("đường dẫn dữ liệu đã đọc")
 data <- read.csv("/home/thai/BTL-XSTK/archive/Intel_CPUs.csv")
-View(data)
 
 ## Thống nhất định dạng cho dữ liệu trống
 data[data == "N/A"] <- NA
 data[data == "NA"] <- NA
 data[data == ""] <- NA
+
+View(data)
+
 
 ## Lọc các thông số kĩ thuật
 # Đã sửa lỗi chính tả chữ "Available"
