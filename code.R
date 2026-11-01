@@ -25,14 +25,15 @@ View(data)
 
 ## Xử lí dữ liệu trống
 {
+  # Tìm số thực thể khuyết mỗi cột 
   na_count <- colSums(is.na(data))
   print(na_count)
   
-  ## Xóa các dòng khuyết ở Processor_Base_Frequency, Embedded_Options_Available 
+  # Xóa các dòng khuyết ở Processor_Base_Frequency, Embedded_Options_Available 
   cols_drop <- c("Processor_Base_Frequency", "Embedded_Options_Available","TDP","Lithography")
   data <- data[complete.cases(data[, cols_drop]), ] # Thay // bằng # để không bị lỗi cú pháp
 
-  ## Kiểm tra lại số NA từng cột
+  # Kiểm tra lại số NA từng cột
   print(colSums(is.na(data)))
   View(data)
 }
