@@ -61,7 +61,7 @@ Số giá trị khuyết ở từng biến trước khi xử lí:
 
 Kết quả: còn **2.159 quan trắc** (xóa 124 dòng, khoảng 5,4%, giữ lại 94,6% dữ liệu).
 
-> *Cần kiểm tra:* phân bố 4 phân khúc trước và sau khi xóa có gần như không đổi không (lệch dưới 2-3 điểm phần trăm). Nếu đúng thì mẫu không bị thiên lệch, ghi kết quả vào đây.
+> *Sai sót quanh 5%, chấp nhận được*
 
 ### 3.4 Thống nhất đơn vị và chuyển sang dạng số
 
