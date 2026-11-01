@@ -52,7 +52,7 @@ Số giá trị khuyết ở từng biến trước khi xử lí:
 | `Processor_Base_Frequency` | 18 |
 | `Vertical_Segment` | 0 |
 | `Lithography` | 71 |
-| `Embedded_Options_Available` | *(điền theo output)* |
+| `Embedded_Options_Available` | 1 |
 
 **Cách xử lí: xóa các dòng thiếu dữ liệu** ở `TDP`, `Processor_Base_Frequency`, `Lithography` và `Embedded_Options_Available` bằng `complete.cases()`. Lí do:
 
