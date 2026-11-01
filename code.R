@@ -36,8 +36,8 @@ View(data)
 }
 
 ## Thống nhất đơn vị
-#  Bar chart DẠNG CHUỖI (thay số bằng #)
 {
+  #  Bar chart DẠNG CHUỖI (thay số bằng #)
   plot_pattern <- function(x, name) {
     p <- trimws(gsub(",", "", as.character(x)))
     p <- gsub("[0-9]+(\\.[0-9]+)?", "#", p)
@@ -53,7 +53,7 @@ View(data)
   
   plot_pattern(data$Processor_Base_Frequency,    "Xung nhịp")
   
-  ## Đổi xung nhịp về một đơn vị duy nhất: GHz (dạng số)
+  # Đổi xung nhịp về một đơn vị duy nhất: GHz (dạng số)
   {
     f   <- trimws(as.character(data$Processor_Base_Frequency))
     val <- as.numeric(sub("^([0-9.]+).*", "\\1", f))            # lấy số đầu tiên
