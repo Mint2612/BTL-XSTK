@@ -95,7 +95,7 @@ View(data)
 ### dán sau phần tiền xử lí. Cần có sẵn biến `data` đã tiền xử lí.
 ### Kết quả: Bảng 1-10 xuất ra thư mục "bang/", Hình 1-9 xuất ra thư mục "hinh/".
 ### Tất cả đều có số thứ tự và tiêu đề; không in gì ra console.
-
+str(data)
 ## ======================= 4.0 Chuẩn bị =======================
 graphics.off()
 par(mar = c(5, 4, 4, 2) + 0.1, mfrow = c(1, 1))
