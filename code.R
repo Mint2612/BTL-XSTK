@@ -43,7 +43,9 @@ col_emb <- c("grey60", "steelblue")                           # No, Yes
 
 # Vẽ ra khung Plots rồi lưu PNG vào "hinh/"
 show_save <- function(file, plot_fn, w = 1600, h = 1200) {
-  plot_fn()
+  # Khung Plots nhỏ có thể báo lỗi margin -> bỏ qua hiển thị, vẫn lưu PNG bình thường
+  tryCatch(plot_fn(), error = function(e)
+    message("Khung Plots quá nhỏ, bỏ qua hiển thị (", file, "); ảnh PNG vẫn được lưu."))
   png(file.path("hinh", file), width = w, height = h, res = 200)
   plot_fn()
   invisible(dev.off())
@@ -435,7 +437,7 @@ save_table("bang19.png", bang19, "Bảng 19. Hệ số VIF của mô hình 1")
 
 # --- Biểu đồ chẩn đoán phần dư (Hình 11, 12) ---
 diag_plot <- function(m, ten) {
-  op <- par(mfrow = c(2, 2), oma = c(0, 0, 2.5, 0))
+  op <- par(mfrow = c(2, 2), mar = c(4, 4, 2, 1), oma = c(0, 0, 2.5, 0))
   on.exit(par(op))
   plot(m, which = 1:4)
   mtext(ten, outer = TRUE, font = 2)
@@ -468,7 +470,7 @@ save_table("bang20.png", bang20,
 
 # --- Thực tế vs dự báo (Hình 13) ---
 show_save("hinh13_thucte_dubao.png", function() {
-  op <- par(mfrow = c(1, 2), oma = c(0, 0, 2.5, 0)); on.exit(par(op))
+  op <- par(mfrow = c(1, 2), mar = c(4, 4, 2, 1), oma = c(0, 0, 2.5, 0)); on.exit(par(op))
   lim <- range(test$TDP, pred1, pred2)
   plot(test$TDP, pred1, pch = 20, col = "steelblue", xlim = lim, ylim = lim,
        xlab = "TDP thực tế (W)", ylab = "TDP dự báo (W)", main = "Mô hình 1")
