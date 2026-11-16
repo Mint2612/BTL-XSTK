@@ -436,16 +436,20 @@ names(bang19) <- c("Biến", "GVIF", "Df", "GVIF^(1/(2·Df))", "Mức cộng tuy
 save_table("bang19.png", bang19, "Bảng 19. Hệ số VIF của mô hình 1")
 
 # --- Biểu đồ chẩn đoán phần dư (Hình 11, 12) ---
-diag_plot <- function(m, ten) {
-  op <- par(mfrow = c(2, 2), mar = c(4, 4, 2, 1), oma = c(0, 0, 2.5, 0))
+diag_plot <- function(model, title_text) {
+  op <- par(mfrow = c(2, 2), oma = c(0, 0, 3.5, 0), mar = c(4, 4, 2, 1))
   on.exit(par(op))
-  plot(m, which = 1:4)
-  mtext(ten, outer = TRUE, font = 2)
+  
+  # Thêm sub.caption = "" để tắt chữ lm(fm1) bị đè lên tiêu đề
+  plot(model, which = 1:4, sub.caption = "")
+  
+  mtext(title_text, outer = TRUE, cex = 1.2, font = 2, line = 1)
 }
 show_save("hinh11_chandoan_m1.png", function()
-  diag_plot(m1, "Hình 11. Chẩn đoán phần dư - Mô hình 1 (TDP)"))
+  diag_plot(m1, "Hình 11. Chẩn đoán phần dư\nMô hình 1 (TDP)"))
+
 show_save("hinh12_chandoan_m2.png", function()
-  diag_plot(m2, "Hình 12. Chẩn đoán phần dư - Mô hình 2 (log TDP)"))
+  diag_plot(m2, "Hình 12. Chẩn đoán phần dư\nMô hình 2 (log TDP)"))
 
 # --- Đánh giá dự báo trên tập kiểm tra: MAE, RMSE (Bảng 20) ---
 pred1 <- predict(m1, newdata = test)
