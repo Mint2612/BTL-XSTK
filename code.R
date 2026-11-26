@@ -22,7 +22,7 @@
 
 # ============================== 0. CẤU HÌNH =================================
 
-DATA_PATH <- "Intel_CPUs.csv"   # <-- đường dẫn tương đối; sửa nếu file nằm nơi khác
+DATA_PATH <- "/home/thai/Desktop/Github/xstk/BTL-XSTK/archive/Intel_CPUs.csv"   # <-- đường dẫn tương đối; sửa nếu file nằm nơi khác
 ALPHA     <- 0.05               # mức ý nghĩa
 SEED      <- 2026               # cố định chia train/test
 TRAIN_PCT <- 0.8                # tỉ lệ tập huấn luyện
@@ -45,7 +45,7 @@ col_emb <- c("grey60", "steelblue")                           # No, Yes
 
 
 # ======================== 0.1 HÀM TIỆN ÍCH (dùng chung) ======================
-
+# 
 # Vẽ ra khung Plots rồi lưu PNG vào "hinh/"
 show_save <- function(file, plot_fn, w = 1600, h = 1200) {
   # Khung Plots nhỏ có thể báo lỗi margin -> bỏ qua hiển thị, vẫn lưu PNG bình thường
