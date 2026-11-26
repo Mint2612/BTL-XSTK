@@ -6,23 +6,28 @@
 #    0. Cấu hình & hàm tiện ích
 #    3. Tiền xử lí số liệu
 #    4. Thống kê mô tả          -> Bảng 1-10,  Hình 1-9
-#    5. Thống kê suy diễn       -> Bảng 11-20, Hình 10-13
-#         5.1 ANOVA một nhân tố (TDP ~ Vertical_Segment) + Tukey HSD
-#         5.2 Kruskal-Wallis + Wilcoxon cặp (Bonferroni)
-#         5.3 So sánh TDP theo Embedded_Options_Available
-#         5.4 Hồi quy tuyến tính bội (OLS), VIF, MAE / RMSE
+#    5. Thống kê suy diễn       -> Bảng 11-26, Hình 10-13
+#         5.1 Ước lượng khoảng tin cậy & kiểm định một mẫu (t, Wilcoxon, tỉ lệ)
+#         5.2 Kiểm định hệ số tương quan (Pearson, Spearman)
+#         5.3 ANOVA một nhân tố (TDP ~ Vertical_Segment) + Tukey HSD
+#         5.4 Kruskal-Wallis + Wilcoxon cặp (Bonferroni)
+#         5.5 So sánh TDP theo Embedded_Options_Available
+#         5.6 Hồi quy tuyến tính bội (OLS), VIF, giả định, chọn biến AIC, MAE / RMSE
 #
 #  KẾT QUẢ: bảng -> thư mục "bang/" (PNG + CSV), hình -> thư mục "hinh/"
-#  CÁCH CHẠY: sửa DATA_PATH rồi chạy toàn bộ file (source) từ trên xuống.
+#  CÁCH CHẠY: đặt Intel_CPUs.csv cùng thư mục với code.R (hoặc sửa DATA_PATH),
+#             đặt thư mục làm việc là thư mục chứa code.R, rồi source toàn bộ file.
 ###############################################################################
 
 
 # ============================== 0. CẤU HÌNH =================================
 
-DATA_PATH <- "/home/thai/Desktop/Github/xstk/BTL-XSTK/archive/Intel_CPUs.csv"   # <-- sửa đường dẫn
-ALPHA     <- 0.05                                            # mức ý nghĩa
-SEED      <- 2026                                            # cố định chia train/test
-TRAIN_PCT <- 0.8                                             # tỉ lệ tập huấn luyện
+DATA_PATH <- "Intel_CPUs.csv"   # <-- đường dẫn tương đối; sửa nếu file nằm nơi khác
+ALPHA     <- 0.05               # mức ý nghĩa
+SEED      <- 2026               # cố định chia train/test
+TRAIN_PCT <- 0.8                # tỉ lệ tập huấn luyện
+MU0       <- 65                 # mốc kiểm định một mẫu: TDP trung bình của Desktop (W)
+P0        <- 0.5                # mốc kiểm định tỉ lệ CPU có tùy chọn nhúng
 
 dir.create("hinh", showWarnings = FALSE)
 dir.create("bang", showWarnings = FALSE)
@@ -99,7 +104,11 @@ ket_luan <- function(p, alpha = ALPHA)
 # ========================= 3. TIỀN XỬ LÍ SỐ LIỆU ============================
 
 ## 3.1 Đọc dữ liệu, thống nhất giá trị trống ("N/A", "NA", "") thành NA
+if (!file.exists(DATA_PATH))
+  stop("Không tìm thấy file dữ liệu: ", DATA_PATH,
+       "\nHãy đặt Intel_CPUs.csv vào thư mục làm việc hoặc sửa DATA_PATH.")
 data <- read.csv(DATA_PATH, na.strings = c("N/A", "NA", ""), stringsAsFactors = FALSE)
+cat("Số quan trắc ban đầu:", nrow(data), "| số cột:", ncol(data), "\n")
 
 ## 3.2 Lọc 6 biến phục vụ đề tài
 data <- data[, c("TDP",                          # Y: công suất thiết kế nhiệt
@@ -109,10 +118,9 @@ data <- data[, c("TDP",                          # Y: công suất thiết kế 
                  "Lithography",                  # tiến trình (nm)
                  "Embedded_Options_Available")]  # tùy chọn nhúng
 
-## 3.3 Xử lí dữ liệu khuyết: xóa dòng thiếu ở các biến cần dùng
+## 3.3 Xử lí dữ liệu khuyết: xóa dòng thiếu ở BẤT KÌ biến nào trong 6 biến
 print(colSums(is.na(data)))                                  # số NA trước xử lí
-cols_drop <- c("TDP", "Processor_Base_Frequency", "Lithography", "Embedded_Options_Available")
-data <- data[complete.cases(data[, cols_drop]), ]
+data <- data[complete.cases(data), ]
 print(colSums(is.na(data)))                                  # kiểm tra lại: phải bằng 0
 
 ## 3.4 Thống nhất đơn vị và chuyển sang dạng số
@@ -128,7 +136,8 @@ plot_pattern <- function(x, name) {
   text(bp, as.vector(tb), labels = as.vector(tb), pos = 3, cex = 0.7)
   par(mar = c(5, 4, 4, 2) + 0.1)
 }
-plot_pattern(data$Processor_Base_Frequency, "Xung nhịp (trước khi đổi đơn vị)")
+tryCatch(plot_pattern(data$Processor_Base_Frequency, "Xung nhịp (trước khi đổi đơn vị)"),
+         error = function(e) message("Khung Plots quá nhỏ, bỏ qua biểu đồ dạng chuỗi."))
 
 # Lấy số đầu tiên trong chuỗi (tránh nối nhầm các chữ số phía sau đơn vị)
 first_num <- function(x) as.numeric(sub("^([0-9.]+).*", "\\1", trimws(as.character(x))))
@@ -148,8 +157,12 @@ data$Vertical_Segment <- factor(data$Vertical_Segment,
 data$Embedded_Options_Available <- factor(data$Embedded_Options_Available,
                                           levels = c("No", "Yes"))
 
+# Loại các dòng còn NA sau khi ép kiểu / ép factor (nếu có)
+data <- data[complete.cases(data), ]
+
 ## 3.6 Kiểm tra lại cấu trúc dữ liệu sạch
-str(data)    # kì vọng: 2159 obs. of 6 variables, không còn NA
+str(data)    # kì vọng: khoảng 2159 obs. of 6 variables, không còn NA
+cat("Số quan trắc sau tiền xử lí:", nrow(data), "\n")
 
 
 # ============================ 4. THỐNG KÊ MÔ TẢ ==============================
@@ -291,38 +304,90 @@ show_save("hinh09_bar_tientrinh.png", function() bar_discrete("Lithography", 9, 
 # Mỗi phương pháp: giả thuyết -> kiểm tra giả định -> kết quả -> kết luận.
 
 ## ----------------------------------------------------------------------------
-## 5.1 ANOVA MỘT NHÂN TỐ: TDP theo Vertical_Segment
+## 5.1 ƯỚC LƯỢNG KHOẢNG TIN CẬY & KIỂM ĐỊNH MỘT MẪU
+## ----------------------------------------------------------------------------
+
+# (a) Khoảng tin cậy 95% của TDP trung bình theo phân khúc (Bảng 11)
+ci_seg <- do.call(rbind, lapply(levels(data$Vertical_Segment), function(s) {
+  x  <- data$TDP[data$Vertical_Segment == s]
+  ci <- t.test(x, conf.level = 1 - ALPHA)$conf.int
+  data.frame(s, length(x), round(mean(x), 2), round(ci[1], 2), round(ci[2], 2))
+}))
+names(ci_seg) <- c("Phân khúc", "n", "TDP trung bình (W)", "CI 95% dưới", "CI 95% trên")
+save_table("bang11.png", ci_seg, "Bảng 11. Khoảng tin cậy 95% của TDP trung bình theo phân khúc")
+
+# (b) Kiểm định một mẫu cho TDP của Desktop (Bảng 12)
+#     H0: mu = MU0   |   H1: mu != MU0
+xd <- data$TDP[data$Vertical_Segment == "Desktop"]
+t1 <- t.test(xd, mu = MU0)
+w1 <- suppressWarnings(wilcox.test(xd, mu = MU0))
+bang12 <- data.frame(
+  c("t-test một mẫu", "Wilcoxon signed-rank"),
+  c(sprintf("t = %.2f (df = %.0f)", t1$statistic, t1$parameter), sprintf("V = %.0f", w1$statistic)),
+  c(fmt_p(t1$p.value), fmt_p(w1$p.value)),
+  ket_luan(c(t1$p.value, w1$p.value)))
+names(bang12) <- c("Kiểm định", "Thống kê", "p-value", "Kết luận (α = 0.05)")
+save_table("bang12.png", bang12,
+           sprintf("Bảng 12. Kiểm định TDP của Desktop so với mốc %g W (n = %d)", MU0, length(xd)))
+
+# (c) Kiểm định tỉ lệ CPU có tùy chọn nhúng (Bảng 13)
+#     H0: p = P0   |   H1: p != P0
+n_yes <- sum(data$Embedded_Options_Available == "Yes")
+pt <- prop.test(n_yes, nrow(data), p = P0, conf.level = 1 - ALPHA)
+bang13 <- data.frame("Tỉ lệ CPU có tùy chọn nhúng", n_yes, nrow(data),
+                     round(unname(pt$estimate), 4),
+                     sprintf("[%.4f; %.4f]", pt$conf.int[1], pt$conf.int[2]),
+                     fmt_p(pt$p.value), ket_luan(pt$p.value))
+names(bang13) <- c("Đại lượng", "Số Yes", "n", "Tỉ lệ mẫu", "CI 95%", "p-value", "Kết luận")
+save_table("bang13.png", bang13,
+           sprintf("Bảng 13. Kiểm định tỉ lệ CPU có tùy chọn nhúng (p0 = %g)", P0))
+
+## ----------------------------------------------------------------------------
+## 5.2 KIỂM ĐỊNH HỆ SỐ TƯƠNG QUAN giữa TDP và từng biến X
+##     H0: hệ số tương quan = 0   |   H1: hệ số tương quan khác 0
+## ----------------------------------------------------------------------------
+cr <- do.call(rbind, lapply(vars[-1], function(v) {
+  p <- cor.test(data$TDP, data[[v]], method = "pearson")
+  s <- suppressWarnings(cor.test(data$TDP, data[[v]], method = "spearman"))
+  data.frame(labels[[v]], round(unname(p$estimate), 3), fmt_p(p$p.value),
+             round(unname(s$estimate), 3), fmt_p(s$p.value))
+}))
+names(cr) <- c("Biến X", "r Pearson", "p (Pearson)", "rho Spearman", "p (Spearman)")
+save_table("bang14.png", cr, "Bảng 14. Kiểm định hệ số tương quan giữa TDP và các biến X")
+
+## ----------------------------------------------------------------------------
+## 5.3 ANOVA MỘT NHÂN TỐ: TDP theo Vertical_Segment
 ##     H0: TDP trung bình của 4 phân khúc bằng nhau
 ##     H1: có ít nhất một cặp phân khúc có TDP trung bình khác nhau
 ## ----------------------------------------------------------------------------
 fit_aov <- aov(TDP ~ Vertical_Segment, data = data)
 res_aov <- residuals(fit_aov)
 
-# Bảng ANOVA (Bảng 11)
+# Bảng ANOVA (Bảng 15)
 a <- summary(fit_aov)[[1]]
-bang11 <- data.frame(
+bang15 <- data.frame(
   c("Giữa các nhóm (Phân khúc)", "Trong nội bộ nhóm (Phần dư)"),
   a$Df, round(a$`Sum Sq`, 1), round(a$`Mean Sq`, 1),
   c(round(a$`F value`[1], 2), ""), c(fmt_p(a$`Pr(>F)`[1]), ""))
-names(bang11) <- c("Nguồn biến thiên", "Bậc tự do", "Tổng bình phương",
+names(bang15) <- c("Nguồn biến thiên", "Bậc tự do", "Tổng bình phương",
                    "Bình phương TB", "F", "p-value")
-save_table("bang11.png", bang11, "Bảng 11. Bảng ANOVA một nhân tố: TDP theo phân khúc")
+save_table("bang15.png", bang15, "Bảng 15. Bảng ANOVA một nhân tố: TDP theo phân khúc")
 
-# Kiểm tra giả định (Bảng 12)
+# Kiểm tra giả định (Bảng 16)
 sw  <- shapiro.test(res_aov)                                  # chuẩn của phần dư (n < 5000)
 bt  <- bartlett.test(TDP ~ Vertical_Segment, data = data)     # đồng nhất phương sai
 # Levene (Brown-Forsythe): ANOVA trên |TDP - trung vị nhóm|
 z   <- abs(data$TDP - ave(data$TDP, data$Vertical_Segment, FUN = median))
 lev <- anova(lm(z ~ data$Vertical_Segment))
-bang12 <- data.frame(
+bang16 <- data.frame(
   c("Shapiro-Wilk (phần dư chuẩn)", "Bartlett (đồng nhất phương sai)",
     "Levene (đồng nhất phương sai)"),
   c(sprintf("W = %.4f", sw$statistic), sprintf("K² = %.2f", bt$statistic),
     sprintf("F = %.2f", lev$`F value`[1])),
   c(fmt_p(sw$p.value), fmt_p(bt$p.value), fmt_p(lev$`Pr(>F)`[1])),
   ket_luan(c(sw$p.value, bt$p.value, lev$`Pr(>F)`[1])))
-names(bang12) <- c("Kiểm định", "Thống kê", "p-value", "Kết luận (α = 0.05)")
-save_table("bang12.png", bang12, "Bảng 12. Kiểm tra giả định của ANOVA")
+names(bang16) <- c("Kiểm định", "Thống kê", "p-value", "Kết luận (α = 0.05)")
+save_table("bang16.png", bang16, "Bảng 16. Kiểm tra giả định của ANOVA")
 
 # Q-Q plot phần dư (Hình 10)
 show_save("hinh10_qq_anova.png", function() {
@@ -330,49 +395,49 @@ show_save("hinh10_qq_anova.png", function() {
   qqline(res_aov, col = "red", lwd = 2)
 })
 
-# So sánh bội Tukey HSD (Bảng 13)
+# So sánh bội Tukey HSD (Bảng 17)
 tk <- TukeyHSD(fit_aov)$Vertical_Segment
-bang13 <- data.frame(rownames(tk), round(tk[, c("diff", "lwr", "upr")], 2),
+bang17 <- data.frame(rownames(tk), round(tk[, c("diff", "lwr", "upr")], 2),
                      fmt_p(tk[, "p adj"]), ket_luan(tk[, "p adj"]), row.names = NULL)
-names(bang13) <- c("Cặp phân khúc", "Chênh lệch TB", "Cận dưới 95%", "Cận trên 95%",
+names(bang17) <- c("Cặp phân khúc", "Chênh lệch TB", "Cận dưới 95%", "Cận trên 95%",
                    "p hiệu chỉnh", "Kết luận")
-save_table("bang13.png", bang13, "Bảng 13. So sánh bội Tukey HSD của TDP giữa các phân khúc")
+save_table("bang17.png", bang17, "Bảng 17. So sánh bội Tukey HSD của TDP giữa các phân khúc")
 
 ## ----------------------------------------------------------------------------
-## 5.2 KRUSKAL-WALLIS (phi tham số, thay thế ANOVA khi vi phạm giả định)
+## 5.4 KRUSKAL-WALLIS (phi tham số, thay thế ANOVA khi vi phạm giả định)
 ##     H0: phân phối TDP của 4 phân khúc như nhau
 ## ----------------------------------------------------------------------------
-kw <- kruskal.test(TDP ~ Vertical_Segment, data = data)
+kw   <- kruskal.test(TDP ~ Vertical_Segment, data = data)
 eps2 <- unname(kw$statistic) / (nrow(data) - 1)               # cỡ ảnh hưởng epsilon²
-bang14 <- data.frame("TDP ~ Vertical_Segment",
+bang18 <- data.frame("TDP ~ Vertical_Segment",
                      round(unname(kw$statistic), 2), unname(kw$parameter),
                      fmt_p(kw$p.value), round(eps2, 3), ket_luan(kw$p.value))
-names(bang14) <- c("Mô hình", "H", "Bậc tự do", "p-value", "Cỡ ảnh hưởng ε²", "Kết luận")
-save_table("bang14.png", bang14, "Bảng 14. Kiểm định Kruskal-Wallis: TDP theo phân khúc")
+names(bang18) <- c("Mô hình", "H", "Bậc tự do", "p-value", "Cỡ ảnh hưởng ε²", "Kết luận")
+save_table("bang18.png", bang18, "Bảng 18. Kiểm định Kruskal-Wallis: TDP theo phân khúc")
 
-# Wilcoxon từng cặp, hiệu chỉnh Bonferroni (Bảng 15)
+# Wilcoxon từng cặp, hiệu chỉnh Bonferroni (Bảng 19)
 pw <- suppressWarnings(
   pairwise.wilcox.test(data$TDP, data$Vertical_Segment, p.adjust.method = "bonferroni")$p.value)
 pw_chr <- matrix(ifelse(is.na(pw), "-", fmt_p(pw)), nrow = nrow(pw), dimnames = dimnames(pw))
-bang15 <- with_rn(pw_chr, "Phân khúc")
-save_table("bang15.png", bang15, "Bảng 15. p-value Wilcoxon từng cặp phân khúc (Bonferroni)")
+bang19 <- with_rn(pw_chr, "Phân khúc")
+save_table("bang19.png", bang19, "Bảng 19. p-value Wilcoxon từng cặp phân khúc (Bonferroni)")
 
 ## ----------------------------------------------------------------------------
-## 5.3 SO SÁNH TDP THEO Embedded_Options_Available (2 nhóm: No / Yes)
+## 5.5 SO SÁNH TDP THEO Embedded_Options_Available (2 nhóm: No / Yes)
 ##     H0: TDP trung bình (hoặc phân phối) của 2 nhóm như nhau
 ## ----------------------------------------------------------------------------
 tt <- t.test(TDP ~ Embedded_Options_Available, data = data)   # Welch (không giả định phương sai bằng nhau)
 wt <- suppressWarnings(wilcox.test(TDP ~ Embedded_Options_Available, data = data))
-bang16 <- data.frame(
+bang20 <- data.frame(
   c("t-test Welch", "Wilcoxon rank-sum"),
   c(sprintf("t = %.2f (df = %.0f)", tt$statistic, tt$parameter), sprintf("W = %.0f", wt$statistic)),
   c(fmt_p(tt$p.value), fmt_p(wt$p.value)),
   ket_luan(c(tt$p.value, wt$p.value)))
-names(bang16) <- c("Kiểm định", "Thống kê", "p-value", "Kết luận (α = 0.05)")
-save_table("bang16.png", bang16, "Bảng 16. So sánh TDP giữa nhóm No và Yes (tùy chọn nhúng)")
+names(bang20) <- c("Kiểm định", "Thống kê", "p-value", "Kết luận (α = 0.05)")
+save_table("bang20.png", bang20, "Bảng 20. So sánh TDP giữa nhóm No và Yes (tùy chọn nhúng)")
 
 ## ----------------------------------------------------------------------------
-## 5.4 HỒI QUY TUYẾN TÍNH BỘI (OLS)
+## 5.6 HỒI QUY TUYẾN TÍNH BỘI (OLS)
 ##     Mô hình 1: TDP        ~ các biến X
 ##     Mô hình 2: log(TDP)   ~ các biến X   (giảm lệch phải, ổn định phương sai)
 ## ----------------------------------------------------------------------------
@@ -390,20 +455,20 @@ fml2 <- update(fml1, log(TDP) ~ .)
 m1 <- lm(fml1, data = train)
 m2 <- lm(fml2, data = train)
 
-# --- Bảng hệ số mô hình 1 (Bảng 17) ---
+# --- Bảng hệ số mô hình 1 (Bảng 21) ---
 sm1 <- summary(m1)
 ci1 <- confint(m1)
-bang17 <- data.frame(rownames(sm1$coefficients),
+bang21 <- data.frame(rownames(sm1$coefficients),
                      round(sm1$coefficients[, "Estimate"], 3),
                      round(sm1$coefficients[, "Std. Error"], 3),
                      round(sm1$coefficients[, "t value"], 2),
                      fmt_p(sm1$coefficients[, "Pr(>|t|)"]),
                      round(ci1[, 1], 3), round(ci1[, 2], 3), row.names = NULL)
-names(bang17) <- c("Hệ số", "Ước lượng", "Sai số chuẩn", "t", "p-value",
+names(bang21) <- c("Hệ số", "Ước lượng", "Sai số chuẩn", "t", "p-value",
                    "CI 95% dưới", "CI 95% trên")
-save_table("bang17.png", bang17, "Bảng 17. Hệ số hồi quy mô hình 1 (biến phụ thuộc TDP)", cex = 0.9)
+save_table("bang21.png", bang21, "Bảng 21. Hệ số hồi quy mô hình 1 (biến phụ thuộc TDP)", cex = 0.9)
 
-# --- Độ phù hợp của hai mô hình (Bảng 18) ---
+# --- Độ phù hợp của hai mô hình (Bảng 22) ---
 fit_stat <- function(m, ten) {
   s <- summary(m); fs <- s$fstatistic
   data.frame(ten, round(s$r.squared, 4), round(s$adj.r.squared, 4),
@@ -411,12 +476,14 @@ fit_stat <- function(m, ten) {
                                                lower.tail = FALSE)),
              round(s$sigma, 3))
 }
-bang18 <- rbind(fit_stat(m1, "Mô hình 1: TDP"), fit_stat(m2, "Mô hình 2: log(TDP)"))
-names(bang18) <- c("Mô hình", "R²", "R² hiệu chỉnh", "F", "p-value (F)", "Sai số chuẩn phần dư")
-save_table("bang18.png", bang18, "Bảng 18. Độ phù hợp của các mô hình hồi quy (tập huấn luyện)")
+bang22 <- rbind(fit_stat(m1, "Mô hình 1: TDP"), fit_stat(m2, "Mô hình 2: log(TDP)"))
+names(bang22) <- c("Mô hình", "R²", "R² hiệu chỉnh", "F", "p-value (F)", "Sai số chuẩn phần dư")
+save_table("bang22.png", bang22, "Bảng 22. Độ phù hợp của các mô hình hồi quy (tập huấn luyện)")
 
-# --- Đa cộng tuyến: VIF (Bảng 19). Với biến factor, car::vif trả GVIF^(1/(2*Df)) ---
+# --- Đa cộng tuyến: VIF (Bảng 23). Với biến factor, dùng GVIF^(1/(2*Df)) ---
 #      GVIF = det(R_term) * det(R_còn lại) / det(R_tất cả), R = ma trận tương quan các cột X
+#      Lưu ý: Vertical_Segment = "Embedded" có thể trùng phần lớn với Embedded_Options = "Yes"
+#      (xem Bảng 3, 4) -> đây là nguồn cộng tuyến cần bàn trong báo cáo.
 mm   <- model.matrix(m1)
 X    <- mm[, -1]
 R    <- cor(X)
@@ -428,21 +495,48 @@ vf <- t(sapply(seq_along(tlab), function(k) {
   c(GVIF = g, Df = length(i), Adj = g^(1 / (2 * length(i))))
 }))
 rownames(vf) <- tlab
-bang19 <- data.frame(rownames(vf), round(vf[, "GVIF"], 2), vf[, "Df"],
+bang23 <- data.frame(rownames(vf), round(vf[, "GVIF"], 2), vf[, "Df"],
                      round(vf[, "Adj"], 2),
                      ifelse(vf[, "Adj"]^2 < 5, "Thấp", "Cần xem xét"),
                      row.names = NULL)
-names(bang19) <- c("Biến", "GVIF", "Df", "GVIF^(1/(2·Df))", "Mức cộng tuyến")
-save_table("bang19.png", bang19, "Bảng 19. Hệ số VIF của mô hình 1")
+names(bang23) <- c("Biến", "GVIF", "Df", "GVIF^(1/(2·Df))", "Mức cộng tuyến")
+save_table("bang23.png", bang23, "Bảng 23. Hệ số VIF của mô hình 1")
+
+# --- Kiểm định giả định hồi quy (Bảng 24) ---
+#     Shapiro-Wilk (phần dư chuẩn; lấy mẫu con nếu n > 5000),
+#     Breusch-Pagan dạng Koenker (phương sai sai số không đổi),
+#     số điểm ảnh hưởng theo khoảng cách Cook > 4/n
+chk <- function(m, ten) {
+  r  <- residuals(m)
+  rr <- if (length(r) > 5000) sample(r, 5000) else r
+  sw <- shapiro.test(rr)
+  Xm <- model.matrix(m)[, -1]
+  bp_stat <- length(r) * summary(lm(r^2 ~ Xm))$r.squared
+  bp_p    <- pchisq(bp_stat, df = ncol(Xm), lower.tail = FALSE)
+  data.frame(ten, fmt_p(sw$p.value), fmt_p(bp_p),
+             sum(cooks.distance(m) > 4 / length(r)))
+}
+bang24 <- rbind(chk(m1, "Mô hình 1: TDP"), chk(m2, "Mô hình 2: log(TDP)"))
+names(bang24) <- c("Mô hình", "p Shapiro-Wilk", "p Breusch-Pagan", "Số điểm Cook > 4/n")
+save_table("bang24.png", bang24, "Bảng 24. Kiểm tra giả định của mô hình hồi quy")
+
+# --- Chọn biến theo AIC cho mô hình 2 (Bảng 25) ---
+m2_step <- step(m2, trace = 0)
+bien_goc  <- attr(terms(m2), "term.labels")
+bien_giu  <- attr(terms(m2_step), "term.labels")
+bang25 <- data.frame(bien_goc,
+                     ifelse(bien_goc %in% bien_giu, "Giữ lại", "Loại bỏ"),
+                     row.names = NULL)
+names(bang25) <- c("Biến", "Kết quả chọn biến (AIC)")
+save_table("bang25.png", bang25,
+           sprintf("Bảng 25. Chọn biến theo AIC cho mô hình 2 (AIC: %.1f -> %.1f)",
+                   AIC(m2), AIC(m2_step)))
 
 # --- Biểu đồ chẩn đoán phần dư (Hình 11, 12) ---
 diag_plot <- function(model, title_text) {
   op <- par(mfrow = c(2, 2), oma = c(0, 0, 3.5, 0), mar = c(4, 4, 2, 1))
   on.exit(par(op))
-  
-  # Thêm sub.caption = "" để tắt chữ lm(fm1) bị đè lên tiêu đề
   plot(model, which = 1:4, sub.caption = "")
-  
   mtext(title_text, outer = TRUE, cex = 1.2, font = 2, line = 1)
 }
 show_save("hinh11_chandoan_m1.png", function()
@@ -451,7 +545,7 @@ show_save("hinh11_chandoan_m1.png", function()
 show_save("hinh12_chandoan_m2.png", function()
   diag_plot(m2, "Hình 12. Chẩn đoán phần dư\nMô hình 2 (log TDP)"))
 
-# --- Đánh giá dự báo trên tập kiểm tra: MAE, RMSE (Bảng 20) ---
+# --- Đánh giá dự báo trên tập kiểm tra: MAE, RMSE (Bảng 26) ---
 pred1 <- predict(m1, newdata = test)
 smear <- mean(exp(residuals(m2)))                             # hệ số hiệu chỉnh khi lấy exp()
 pred2 <- exp(predict(m2, newdata = test)) * smear             # đưa về đơn vị Watt
@@ -464,13 +558,13 @@ metrics <- function(y, yhat)
 
 mt1 <- metrics(test$TDP, pred1)
 mt2 <- metrics(test$TDP, pred2)
-bang20 <- data.frame(c("Mô hình 1: TDP", "Mô hình 2: log(TDP)"),
+bang26 <- data.frame(c("Mô hình 1: TDP", "Mô hình 2: log(TDP)"),
                      round(c(mt1["MAE"],  mt2["MAE"]), 2),
                      round(c(mt1["RMSE"], mt2["RMSE"]), 2),
                      round(c(mt1["R2"],   mt2["R2"]), 4))
-names(bang20) <- c("Mô hình", "MAE (W)", "RMSE (W)", "R² (tập kiểm tra)")
-save_table("bang20.png", bang20,
-           sprintf("Bảng 20. So sánh sai số dự báo trên tập kiểm tra (n = %d)", nrow(test)))
+names(bang26) <- c("Mô hình", "MAE (W)", "RMSE (W)", "R² (tập kiểm tra)")
+save_table("bang26.png", bang26,
+           sprintf("Bảng 26. So sánh sai số dự báo trên tập kiểm tra (n = %d)", nrow(test)))
 
 # --- Thực tế vs dự báo (Hình 13) ---
 show_save("hinh13_thucte_dubao.png", function() {
@@ -488,7 +582,8 @@ show_save("hinh13_thucte_dubao.png", function() {
 ## ---- Xem nhanh trong console khi cần ----
 # print(bang11); print(bang12); print(bang13); print(bang14); print(bang15)
 # print(bang16); print(bang17); print(bang18); print(bang19); print(bang20)
-# summary(m1); summary(m2)
+# print(bang21); print(bang22); print(bang23); print(bang24); print(bang25); print(bang26)
+# summary(m1); summary(m2); summary(m2_step)
 
 ###############################################################################
 # HẾT
